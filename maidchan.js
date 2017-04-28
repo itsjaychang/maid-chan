@@ -5,16 +5,16 @@ const mongoose = require('mongoose');
 const unirest = require('unirest');
 
 const config = require('./config.json');
-const users = require('./stuff/user_tokens.json');
-const misc = require('./stuff/misc.json');
-const user = require('./stuff/user.js');
+const users = require('./extra/user_tokens.json');
+const misc = require('./extra/misc.json');
+const user = require('./extra/user.js');
 
 const client = new Discord.Client();
 
 client.on('ready', () => {
-	mongoose.connect(config.dbURL);
+	mongoose.connect(config.mongoLabURL);
 	database = mongoose.model('user');
-	console.log('thank goodness this works');
+	console.log('Maid-Chan is ready to serve you Master~~~~');
 });
 
 client.on('message', (message) => {
@@ -25,19 +25,19 @@ client.on('message', (message) => {
 	if (message.author.bot) return;
 	if (!msg.startsWith(prefix)) return;
 
-	//test
+	// Slots
 	if (msg.startsWith(`${prefix} credits`)) {
 		database.findOne({'userId': message.author.id}, function(err,user) {
 			if (user == null) {
 				const newUser = {
-								name: message.author.username,
-								userId: message.author.id,
-								points: 500
-								}
+					name: message.author.username,
+					userId: message.author.id,
+					points: 500
+				}
 				database.create(newUser);
 			}
-			const points = user.points ? user.points : 500;
-			message.channel.sendMessage(`${user.name} has ${points} points`);
+			const points = user ? user.points : 500;
+			message.channel.sendMessage(`**${message.author.username}** has ${points} points`);
 		})
 		return;
 	}
@@ -46,26 +46,29 @@ client.on('message', (message) => {
 		const id = message.author.id;
 		database.findOne({'userId': id}, function(err,user) {
 			if (user == null) {
-				message.channel.sendMessage(`${message.author.username}-sama, do credits first <3`)
+				message.channel.sendMessage(`**${message.author.username}**-sama, do credits first <3`);
 				return;
 			} else if (user.points <= 0) {
-				message.channel.sendMessage(`${user.name}-sama, your such a peasant, you have ${user.points}`);
+				message.channel.sendMessage(`**${message.author.username}**-sama, your such a peasant, you have ${user.points}`);
 				return;
 			} else {
 				var splits = message.content.split(' ');
 				var gamble = Number(splits[2]);
+				if (gamble == NaN) {
+					message.channel.sendMessage('Please gamble with proper amount baka');
+					return;
+				}
 				var currentAmount = user.points;
 				if (Math.random() > 0.5) {
 					newAmount = currentAmount - gamble;
-					message.channel.sendMessage(`${user.name}-sama you lose, ${currentAmount} => ${newAmount}`)
+					message.channel.sendMessage(`**${message.author.username}**-sama you lose, ${currentAmount} => ${newAmount}`);
 				} else {
 					newAmount = currentAmount + gamble;
-					message.channel.sendMessage(`${user.name}-sama you won, ${currentAmount} => ${newAmount}`)
+					message.channel.sendMessage(`**${message.author.username}**-sama you won, ${currentAmount} => ${newAmount}`);
 				}
-				database.update({'userId': id}, {$set: {'points': newAmount}},
-                 function (err, user) {
-                     if (err) return handleError(err);
-                 });
+				database.update({'userId': id}, {$set: {'points': newAmount}}, function (err, user) {
+                	if (err) return handleError(err);
+                });
 			}
 		})
 		return;
@@ -79,12 +82,12 @@ client.on('message', (message) => {
 
 				pocky
 				hungry
-				tell me [     ]
-				define [     ]
+				tell me _[~]_
+				define _[~]_
 				credits
 				gamble [#]
 			`
-		})
+		});
 		return;
 	}
 
@@ -100,7 +103,7 @@ client.on('message', (message) => {
 
 	// Filter out the stupid Bakas
 	if (users.bakas.includes(message.author.id)) {
-		message.channel.sendMessage('Go away baka!!')
+		message.channel.sendMessage('Go away baka!!');
 		return;
 	}
 
@@ -123,8 +126,8 @@ client.on('message', (message) => {
 	if (msg.startsWith(`${prefix} define`)) {
 		var splits = message.content.split(' ');
 		splits.splice(0, 2);
-		const search = splits.join("+")
-		const word = splits.join(" ")
+		const search = splits.join("+");
+		const word = splits.join(" ");
 
 		unirest.get("http://api.urbandictionary.com/v0/define?term="+search)
 			.end(function(res) {
@@ -148,13 +151,13 @@ client.on('message', (message) => {
 						});
 					} else {
 						message.channel.sendMessage(`What the hell is ${word} retard...`);
-					}
+					};
     			};
     		});
 		return;
 	}
 
-	message.channel.sendMessage(`Nani?!?!?! Watashi wa dont understand desu ${message.author}-sama~~~`);
+	message.channel.sendMessage(`Nani?!?!?! Watashi wa dont understand desu **${message.author.username}**-sama~~~`);
 });
 
 client.login(config.token);
