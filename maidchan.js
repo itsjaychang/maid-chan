@@ -46,8 +46,16 @@ client.on('message', (message) => {
 			})
 			return promise;
 		}
+		const shiny = function(pokemonJSON) {
+			const shiny = (Math.random() < 0.03) ? true : false;
+			if (shiny) {
+				parseShinyPokemonJSON(pokemonJSON);
+			} else {
+				parsePokemonJSON(pokemonJSON);
+
+			}
+		}
 		const parsePokemonJSON = function(pokemonJSON) {
-			console.log('works');
 			const name = pokemonJSON.name.replace(/(^|\s)[a-z]/g,function(f){return f.toUpperCase()});;
 			const spriteURL = pokemonJSON.sprites.front_default;
 			const embed = new Discord.RichEmbed()
@@ -55,10 +63,17 @@ client.on('message', (message) => {
   				.setImage(spriteURL)
   			message.channel.sendEmbed(embed);
 		}
-		
+		const parseShinyPokemonJSON = function(pokemonJSON) {
+			const name = pokemonJSON.name.replace(/(^|\s)[a-z]/g,function(f){return f.toUpperCase()});;
+			const spriteURL = pokemonJSON.sprites.front_shiny;
+			const embed = new Discord.RichEmbed()
+  				.setDescription(`A wild _SHINY_ **${name}** appeared!!`)	
+  				.setImage(spriteURL)
+  			message.channel.sendEmbed(embed);
+		}
 		getPokemonCount()
 			.then(getPokemon)
-			.then(parsePokemonJSON);
+			.then(shiny);
 
 		return;
 	}
@@ -111,7 +126,6 @@ client.on('message', (message) => {
 		}
 
 		const updateUser = function (newAmount) {
-			console.log(newAmount);
 			database.update({'userId': id}, {$set: {'points': newAmount}}, function (err, user) {
 				if (err) return handleError(err);
 			});
