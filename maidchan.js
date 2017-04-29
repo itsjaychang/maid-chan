@@ -1,19 +1,27 @@
 const Discord = require('discord.js');
-// const {stripIndents} = require('common-tags');
 const mongoose = require('mongoose');
-// const path = require('path');
 const unirest = require('unirest');
 
 const config = require('./config.json');
 const users = require('./extra/user_tokens.json');
 const misc = require('./extra/misc.json');
-const user = require('./extra/user.js');
+const user = require('./database_model/user.js');
+
+const pokemon = require('./fun/pokemon.js');
+const slots = require('./fun/slots.js');
+const urbanDict = require('./fun/urbanDict.js');
+
+const roulette = require('./fun/roulette.js');
+const eargaer = require('./database_model/guildRoulette.js');
+const reaar = require('./database_model/userRoulette.js');
 
 const client = new Discord.Client();
 
 client.on('ready', () => {
 	mongoose.connect(config.mongoURI);
-	database = mongoose.model('user');
+	userDatabase = mongoose.model('user');
+	guildRouletteDatabase = mongoose.model('guildRoulette');
+	userRouletteDatabase = mongoose.model('userRoulette');
 	console.log('Maid-Chan is ready to serve you Master~~~~');
 });
 
@@ -25,130 +33,53 @@ client.on('message', (message) => {
 	if (message.author.bot) return;
 	if (!msg.startsWith(prefix)) return;
 
-	// pokemon
+	// Pokemon.js
 	if (msg.startsWith(`${prefix} pokemon`)) {
-		const getPokemonCount = function() {
-			const promise = new Promise((resolve, reject) => {
-				unirest.get('http://pokeapi.co/api/v2/pokemon-species')
-					.end(function(res) {
-						resolve(res.body.count);
-					});
-			}); 
-			return promise;
-		}
-		const getPokemon = function(count) {
-			const randomId = Math.floor(Math.random()*(count-1)+1);
-			const promise = new Promise((resolve, reject) => {
-				unirest.get('http://pokeapi.co/api/v2/pokemon/'+randomId)
-					.end(function(res) {
-						resolve(res.body);
-					});
-			})
-			return promise;
-		}
-		const shiny = function(pokemonJSON) {
-			const shiny = (Math.random() < 0.03) ? true : false;
-			if (shiny) {
-				parseShinyPokemonJSON(pokemonJSON);
-			} else {
-				parsePokemonJSON(pokemonJSON);
-
-			}
-		}
-		const parsePokemonJSON = function(pokemonJSON) {
-			const name = pokemonJSON.name.replace(/(^|\s)[a-z]/g,function(f){return f.toUpperCase()});;
-			const spriteURL = pokemonJSON.sprites.front_default;
-			const embed = new Discord.RichEmbed()
-  				.setDescription(`A wild **${name}** appeared!!`)	
-  				.setImage(spriteURL)
-  			message.channel.sendEmbed(embed);
-		}
-		const parseShinyPokemonJSON = function(pokemonJSON) {
-			const name = pokemonJSON.name.replace(/(^|\s)[a-z]/g,function(f){return f.toUpperCase()});;
-			const spriteURL = pokemonJSON.sprites.front_shiny;
-			const embed = new Discord.RichEmbed()
-  				.setDescription(`A wild _SHINY_ **${name}** appeared!!`)	
-  				.setImage(spriteURL)
-  			message.channel.sendEmbed(embed);
-		}
-		getPokemonCount()
-			.then(getPokemon)
-			.then(shiny);
-
+		pokemon.getPokemon(message);
 		return;
 	}
 
-	// Slots
-	if (msg.startsWith(`${prefix} credits`)) {
-		database.findOne({'userId': message.author.id}, function(err,user) {
-			if (user == null) {
-				const newUser = {
-					name: message.author.username,
-					userId: message.author.id,
-					points: 500
-				}
-				database.create(newUser);
-			}
-			const points = user ? user.points : 500;
-			message.channel.sendMessage(`**${message.author.username}** has ${points} points`);
-		})
+	// Slots.js
+	if (msg.startsWith(`${prefix} points`)) {
+		slots.points(message);
 		return;
 	}
 
 	if (msg.startsWith(`${prefix} gamble`)) {
-		var splits = message.content.split(' ');
-		var gambleAmount = Number(splits[2]);
-		const id = message.author.id;
-
-		if (Number.isNaN(gambleAmount)) {
-			message.channel.sendMessage('Please gamble with proper amount baka');
-			return;
-		}
-
-		const getUser = function() {
-			const promise = new Promise((resolve, reject) => {
-				database.findOne({'userId': id}, function(err, user) {
-					resolve(user);
-				})
-			});
-			return promise;
-		}
-
-		const gamble = function(user) {
-			const promise = new Promise((resolve, reject) => {
-				const currentAmount = user.points;
-				const win = Math.random() < 0.5 ? true : false;
-				const newAmount = win ? (currentAmount + gambleAmount) : (currentAmount - gambleAmount);
-				message.channel.sendMessage(`**${message.author.username}**-sama you ${win ? 'win' : 'lose'}, ${currentAmount} => ${newAmount}`)
-				resolve(newAmount);
-			});
-			return promise;
-		}
-
-		const updateUser = function (newAmount) {
-			database.update({'userId': id}, {$set: {'points': newAmount}}, function (err, user) {
-				if (err) return handleError(err);
-			});
-			return;
-		}
-
-		const conditional = function(user) {
-			if (user == null) {
-				message.channel.sendMessage(`**${message.author.username}**-sama, do credits first <3`);
-				return;
-			} else if (user.points <= 0) {
-				message.channel.sendMessage(`**${message.author.username}**-sama, your such a peasant, you have ${user.points} points :,(`);
-				return;
-			} else {
-				return gamble(user).then(updateUser);
-			}
-		}
-		getUser()
-			.then(conditional);
-	
+		slots.gamble(message);
 		return;
 	}
 
+	// Roulette.js
+	if (msg == `${prefix} roulette start`) {
+		roulette.begin(message);
+		return;
+	}
+
+	if (msg == `${prefix} roulette help`) {
+		roulette.help(message);
+		return;
+	}
+
+	if (msg == `${prefix} roulette`) {
+		roulette.account(message);
+		return;
+	}
+
+	if (msg.startsWith(`${prefix} bet`)) {
+		roulette.bet(message);
+		return;
+	}
+
+	// if (msg.startsWith(`${prefix} choose`)) {
+	// 	roulette.choose(message);
+	// 	return;
+	// }
+
+	// if (msg == `${prefix} status` || msg == `${prefix} create`) {
+	// 	roulette.account(message);
+	// 	return;
+	// }
 	// Both Masters and Baka
 	if (msg.startsWith(`${prefix} help`)) {
 		message.channel.sendEmbed({ description: 
@@ -159,7 +90,7 @@ client.on('message', (message) => {
 				hungry
 				tell me _[~]_
 				define _[~]_
-				credits
+				points
 				gamble [#]
 				pokemon
 			`
@@ -200,37 +131,7 @@ client.on('message', (message) => {
 	}
 
 	if (msg.startsWith(`${prefix} define`)) {
-		var splits = message.content.split(' ');
-		splits.splice(0, 2);
-		const search = splits.join('+');
-		const word = splits.join(' ');
-
-		unirest.get('http://api.urbandictionary.com/v0/define?term='+search)
-			.end(function(res) {
-    			if (res.error) {
-    				message.channel.sendMessage('Something bad happenened... T______T');
-    			} else {
-    				if (res.body.result_type == 'exact') {
-    					const item = res.body.list[0];
-    					const definition = item.definition ? `${item.definition}` : '';
-    					const example = item.example ? `${item.example}` : '';
-    					message.channel.sendEmbed({ description: 
-    						`
-								**${word}**
-
-								_Definition_
-								${definition}
-
-								_Example_
-								${example}
-							`
-						});
-					} else {
-						message.channel.sendMessage(`What the hell is ${word} retard...`);
-					};
-    			};
-    		});
-		return;
+		urbanDict.define(message);
 	}
 
 	if (msg == prefix) {
