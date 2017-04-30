@@ -32,14 +32,20 @@ client.on('message', (message) => {
 	if (message.channel.type == 'dm') return;
 	if (message.author.bot) return;
 
-	if (msg.startsWith('bet')) {
+	// if (msg.startsWith('bet')) {
+	// 	guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
+	// 		if (guild != null && guild.roulette == true) {
+	// 			roulette.bet(message);
+	// 		}
+	// 	})
+	// }
+	if (msg == ('bet')) {
 		guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
 			if (guild != null && guild.roulette == true) {
 				roulette.bet(message);
 			}
 		})
 	}
-
 	if (msg == ('status')) {
 		guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
 			if (guild != null && guild.roulette == true) {

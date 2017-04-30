@@ -11,16 +11,12 @@ const help = function(message) {
 		`
 			**ROULETTES**
 
-			_mc roulette_ to create account if you haven't already (or just _status_ if a game is happening)
+			To begin, _mc roulette start_
 
-			to begin, _mc roulette start_
+			Once games start all you need to do is spam **_bet_**, the more you bet, the higher chance you have to win <3
 
-			Once games start all you need to do is (dont need to type mc)
-			_bet [amount]_ to bet 
 			_roulette_ to see current bets
-			_status_ to check your own status
-			
-			the higher you bet, the higher chance you have to win
+			_status_ to check your own status			
 		`
 	});
 }
@@ -45,8 +41,8 @@ const account = function(message) {
 						'name': message.author.username,
 						'guildId': message.guild.id,
 						'choice': null,
-						'bet': null,
-						'bank': 1000
+						'bet': 0,
+						'bank': 500
 					}
 					userRouletteDatabase.create(newUser);
 					user = newUser;
@@ -64,12 +60,6 @@ const account = function(message) {
 }
 
 const bet = function(message) {
-	const splits = message.content.split(' ');
-	const amount = Number(splits[1]);
-	if (!Number.isInteger(amount)) {
-		message.reply('Please enter a value');
-		return;
-	}
 	getUser(message)
 		.then(betAmount)
 }
@@ -116,18 +106,25 @@ const getUser = function(message) {
 }
 
 const betAmount = function({message, user}) {
-	const splits = message.content.split(' ');
-	const amount = Math.min(Number(splits[1]),500); // Max bet
-	var newBet = Math.max(0, user.bet + amount);
-	if (newBet > user.bank) newBet = user.bank;
+	// const split = message.content.split(' ');
+	// const amount = Math.min(Number(splits[1]),500); // Max bet
+	// const amount = Number(split[1]);
+	// var newBet = Math.max(0, user.bet + amount);
+	var newBet = user.bet + 1;
+	if (newBet > user.bank) {
+		message.reply(`${user.name} you have nothing more to bet`)
+		return;
+	}
 	userRouletteDatabase.update({'userId': message.author.id, 'guildId': message.guild.id}, {$set: {'bet': newBet}}, function (err, user) {
 		if (err) return handleError(err);
 	});
-	message.channel.sendEmbed({ description: 
-		`
-			**${message.author.username}** has bet **${newBet}**
-		`, color: 15473237
-	});
+	if(newBet%20 == 0) {
+		message.channel.sendEmbed({ description: 
+			`
+				**${message.author.username}** has now bet **${newBet}**
+			`, color: 15473237
+		});
+	}
 	return;
 }
 
@@ -183,7 +180,7 @@ const guildStatus = function({message, rouletteStatus}) {
 			playRoulette(message, message.guild.id);
 		});
 	} else {
-		message.channel.sendMessage('roulette already started');
+		message.reply('Roulette has already started, start spamming');
 	}
 }
 
@@ -207,7 +204,7 @@ const playRoulette = function(message, guildId) {
 					`
 						**ROULETTE HAS ${remainingTime/1000} seconds left**
 						${remainingTime > 10000 ? `
-						_bet [amount]_ to bet 
+						spam _bet_
 						_roulette_ to see current bets
 						_status_ to check your own status` : ''
 						}
@@ -219,7 +216,7 @@ const playRoulette = function(message, guildId) {
 					`
 						**ROULETTE HAS STARTED**
 
-						_bet [amount]_ to bet 
+						spam _bet_
 						_roulette_ to see current bets
 						_status_ to check your own status
 					`
@@ -242,11 +239,11 @@ const playRoulette = function(message, guildId) {
 				`
 					**ROULETTE HAS BEGAN**
 
-					_bet [amount]_ to bet 
-					_roulette_ to see current bets
+					spam _bet_
+					_roulette_ to see all current bets
 					_status_ to check your own status
 
-					You have 60 seconds to bet
+					You have 60 seconds to spam bet
 				`
 			});
 			resolve({message: message, time: time});
@@ -262,7 +259,7 @@ const playRoulette = function(message, guildId) {
 
 const getParticipants = function(message) {
 	const promise = new Promise((resolve, reject) => {
-		userRouletteDatabase.find({'guildId': message.guild.id, 'bet': {$ne:null}}, function(err, users) {
+		userRouletteDatabase.find({'guildId': message.guild.id, 'bet': {$ne:0}}, function(err, users) {
 			var raffle = [];
 			var pot = 0;
 			users.forEach(function(user, index) {
@@ -275,7 +272,7 @@ const getParticipants = function(message) {
 				`
 					${users.length == 0 ? 'No one played :(' : users.map(user => 
 					`**${user.name}** has bet **${user.bet}** and has a **${(user.bet/pot*100).toFixed(2)}%** chance to win
-					`).join('')}
+					`).join('\n')}
 				`, color: 15473237
 			})
 			resolve({message:message,users:users, pot:pot, raffle:raffle});
@@ -304,11 +301,11 @@ const chooseWinner = function({message, users, pot, raffle}) {
 			})
 			users.forEach(function(user) {
 				if (user.userId == winningUser.userId) {
-					userRouletteDatabase.update({'userId': user.userId}, {'choice': null, 'bet': null, 'bank': (user.bank + winnerPot)}, function(err, user) {
+					userRouletteDatabase.update({'userId': user.userId, 'guildId': user.guildId}, {'bet': 0, 'bank': (user.bank + winnerPot)}, function(err, user) {
 						if (err) return handleError(err);
 					})	
 				} else {
-					userRouletteDatabase.update({'userId': user.userId}, {'choice': null, 'bet': null, 'bank': (user.bank - user.bet)}, function(err, user) {
+					userRouletteDatabase.update({'userId': user.userId, 'guildId': user.guildId}, {'bet': 0, 'bank': (user.bank - user.bet)}, function(err, user) {
 						if (err) return handleError(err);
 					})				
 				} 
