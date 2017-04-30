@@ -5,15 +5,15 @@ const unirest = require('unirest');
 const config = require('./config.json');
 const users = require('./extra/user_tokens.json');
 const misc = require('./extra/misc.json');
-const user = require('./database_model/user.js');
 
 const pokemon = require('./fun/pokemon.js');
 const slots = require('./fun/slots.js');
 const urbanDict = require('./fun/urbanDict.js');
-
 const roulette = require('./fun/roulette.js');
-const eargaer = require('./database_model/guildRoulette.js');
-const reaar = require('./database_model/userRoulette.js');
+
+require('./database_model/guildRoulette.js');
+require('./database_model/userRoulette.js');
+require('./database_model/user.js');
 
 const client = new Discord.Client();
 
@@ -31,6 +31,31 @@ client.on('message', (message) => {
 
 	if (message.channel.type == 'dm') return;
 	if (message.author.bot) return;
+
+	if (msg.startsWith('bet')) {
+		guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
+			if (guild != null && guild.roulette == true) {
+				roulette.bet(message);
+			}
+		})
+	}
+
+	if (msg == ('status')) {
+		guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
+			if (guild != null && guild.roulette == true) {
+				roulette.account(message);
+			}
+		})
+	}
+
+	if (msg == ('roulette')) {
+		guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
+			if (guild != null && guild.roulette == true) {
+				roulette.roulette(message);
+			}
+		})
+	}
+
 	if (!msg.startsWith(prefix)) return;
 
 	// Pokemon.js
@@ -56,18 +81,13 @@ client.on('message', (message) => {
 		return;
 	}
 
-	if (msg == `${prefix} roulette help`) {
-		roulette.help(message);
-		return;
-	}
-
-	if (msg == `${prefix} roulette`) {
+	if (msg == `${prefix} roulette status`) {
 		roulette.account(message);
 		return;
 	}
 
-	if (msg.startsWith(`${prefix} bet`)) {
-		roulette.bet(message);
+	if (msg.startsWith(`${prefix} roulette`)) {
+		roulette.help(message);
 		return;
 	}
 
@@ -142,4 +162,4 @@ client.on('message', (message) => {
 	message.channel.sendMessage(`Nani?!?!?! Watashi wa dont understand desu **${message.author.username}**-sama~~~`);
 });
 
-client.login(config.token);
+client.login(config.discordToken);

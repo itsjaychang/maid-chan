@@ -11,15 +11,28 @@ const help = function(message) {
 		`
 			**ROULETTES**
 
-			_mc roulette_ to create account if you haven't already
+			_mc roulette_ to create account if you haven't already (or just _status_ if a game is happening)
 
 			to begin, _mc roulette start_
 
-			_mc bet ###_ to add to the pool
+			Once games start all you need to do is (dont need to type mc)
+			_bet [amount]_ to bet 
+			_roulette_ to see current bets
+			_status_ to check your own status
 			
 			the higher you bet, the higher chance you have to win
 		`
 	});
+}
+
+const roulette = function(message) {
+	userRouletteDatabase.find({'guildId': message.guild.id, 'bet': {$ne:null}}, function(err, users) {
+		message.channel.sendEmbed({ description: 
+			`
+				${users.length == 0 ? 'No one currently betting' : users.map(user => `**${user.name}** has currently bet **${user.bet}**`).join('')}
+			`, color: 15473237
+		})
+	});	
 }
 
 const account = function(message) {
@@ -31,8 +44,8 @@ const account = function(message) {
 						'userId': message.author.id,
 						'name': message.author.username,
 						'guildId': message.guild.id,
-						'choice': 0,
-						'bet': 0,
+						'choice': null,
+						'bet': null,
 						'bank': 1000
 					}
 					userRouletteDatabase.create(newUser);
@@ -41,10 +54,10 @@ const account = function(message) {
 				message.channel.sendEmbed({ description: 
 					`
 						**${message.author.username}**
-						bank = ${user.bank}
 
-						${rouletteStatus ? `has bet **${user.bet ? user.bet : 'nothing'}**` : 'No roulette game right now'}
-					`
+						bank = ${user.bank}
+						${rouletteStatus ? (user.bet ? `bet = **${user.bet}**` : 'No bets yet') : 'No roulette game right now to bet'}
+					`, color: 15473237
 				});
 			})
 		})
@@ -52,14 +65,12 @@ const account = function(message) {
 
 const bet = function(message) {
 	const splits = message.content.split(' ');
-	const amount = Math.min(Number(splits[2]),1000);
+	const amount = Number(splits[1]);
 	if (!Number.isInteger(amount)) {
-		message.channel.sendMessage('please enter a value');
+		message.reply('Please enter a value');
 		return;
 	}
-	getGuildStatus(message)
-		.then(rouletteStatus)
-		.then(getUser)
+	getUser(message)
 		.then(betAmount)
 }
 
@@ -78,25 +89,25 @@ const bet = function(message) {
 // } 
 
 ////////////////////////////
-const rouletteStatus = function({message, rouletteStatus}) {
-	const promise = new Promise((resolve, reject) => {
-		if (rouletteStatus == false) {
-			message.channel.sendMessage('no roulette game happening');
-			reject()
-		} else {
-			resolve(message)
-		}
-	})
-	return promise;
-}
+// const rouletteStatus = function({message, rouletteStatus}) {
+// 	const promise = new Promise((resolve, reject) => {
+// 		if (rouletteStatus == false) {
+// 			message.channel.sendMessage('no roulette game happening');
+// 			reject()
+// 		} else {
+// 			resolve(message)
+// 		}
+// 	})
+// 	return promise;
+// }
 
 const getUser = function(message) {
 	const promise = new Promise((resolve, reject) => {
 		userRouletteDatabase.findOne({'userId': message.author.id, 'guildId': message.guild.id}, function(err, user) {
 			if (user) {
-				resolve(message);
+				resolve({message: message, user: user});
 			} else {
-				message.channel.sendMessage('make a roulette account with _mc roulette_');
+				message.reply('Make a roulette account with _status_');
 				reject();
 			}
 		})
@@ -104,30 +115,22 @@ const getUser = function(message) {
 	return promise;
 }
 
-const betAmount = function(message) {
+const betAmount = function({message, user}) {
 	const splits = message.content.split(' ');
-	const amount = Math.min(Number(splits[2]),1000);
-	message.channel.sendMessage(`betting ${amount}`);
-	userRouletteDatabase.findOne({'userId': message.author.id, 'guildId': message.guild.id}, function(err, user) {
-		if (user) { 
-			var newBet = Math.min(Math.max(0, user.bet + amount), 500);
-			if (newBet > user.bank) newBet = user.bank;
-			userRouletteDatabase.update({'userId': message.author.id, 'guildId': message.guild.id}, {$set: {'bet': newBet}}, function (err, user) {
-				if (err) return handleError(err);
-			});
-			message.channel.sendEmbed({ description: 
-				`
-					**${message.author.username}**
-					bank = ${user.bank}
-
-					has bet **${newBet}**
-				`
-			});
-		} else {
-			message.channel.sendMessage('make a roulet account');
-		}
-	})
+	const amount = Math.min(Number(splits[1]),500); // Max bet
+	var newBet = Math.max(0, user.bet + amount);
+	if (newBet > user.bank) newBet = user.bank;
+	userRouletteDatabase.update({'userId': message.author.id, 'guildId': message.guild.id}, {$set: {'bet': newBet}}, function (err, user) {
+		if (err) return handleError(err);
+	});
+	message.channel.sendEmbed({ description: 
+		`
+			**${message.author.username}** has bet **${newBet}**
+		`, color: 15473237
+	});
+	return;
 }
+
 
 // const choseValue = function(message) {
 // 	const splits = message.content.split(' ');
@@ -177,79 +180,84 @@ const guildStatus = function({message, rouletteStatus}) {
 	if (rouletteStatus == false) {
 		guildRouletteDatabase.update({'guildId': message.guild.id}, {$set: {'roulette': true}}, function (err, guild) {
 			if (err) return handleError(err);
-			startRoulette(message, message.guild.id);
+			playRoulette(message, message.guild.id);
 		});
 	} else {
 		message.channel.sendMessage('roulette already started');
 	}
 }
 
-const startRoulette = function(message, guildId) {
-	message.channel.sendEmbed({ description: 
-		`
-			**ROULETTE HAS STARTED**
-
-			_mc roulette account_ to create account if you haven't already
-			_mc bet ###_ to add to the pool
-			the higher you bet, the higher chance you have to win
-		`
-	});
-
+const playRoulette = function(message, guildId) {
 	const delay = function({message,time}) {
+		var remainingTime = time - 1000;
 		const promise = new Promise((resolve, reject) => {
 			setTimeout(function() {
-				remainingTime = time - 5000;
-				message.channel.sendMessage(`timeremaining ${remainingTime/1000} sec`);
-				// message.channel.sendEmbed({ description: 
-				// 	`
-				// 		**ROULETTE HAS ${remainingTime/1000} seconds left**
-				// 		_mc bet ###_ to add to your pool
-				// 		_mc choose ###_ to choose your number
-				// 	`
-				// });		
-			resolve({message: message, time: remainingTime});
-			}, 5000);
+				if (remainingTime <= 0) {
+					message.channel.sendEmbed({ description: 
+					`
+						**ROULETTE HAS ENDED**
+					`
+					});	
+					guildRouletteDatabase.update({'guildId': message.guild.id}, {$set: {'roulette': false}}, function(err, guild) {
+						if (err) return handleError(err);		
+					})	
+					resolve(message);
+				} else if ((remainingTime%5000 == 0 && remainingTime <= 20000)){
+					message.channel.sendEmbed({ description: 
+					`
+						**ROULETTE HAS ${remainingTime/1000} seconds left**
+						${remainingTime > 10000 ? `
+						_bet [amount]_ to bet 
+						_roulette_ to see current bets
+						_status_ to check your own status` : ''
+						}
+					`
+					});	
+					resolve({message: message, time: remainingTime});
+				} else if (remainingTime%10000 == 0) {
+					message.channel.sendEmbed({ description: 
+					`
+						**ROULETTE HAS STARTED**
+
+						_bet [amount]_ to bet 
+						_roulette_ to see current bets
+						_status_ to check your own status
+					`
+					});
+					resolve({message: message, time: remainingTime});
+				} else {
+					resolve({message: message, time: remainingTime});
+				}
+			}, 1000);
 		})
-		return promise;
-	}
+		if (remainingTime <= 0) {
+			return promise;
+			} else {
+			return promise.then(delay)
+		}
+	}	
 	const start = function({message,time}) {
 		const promise = new Promise((resolve, reject) => {
-			message.channel.sendMessage(`timeremaining ${time/1000} sec`);
-			// message.channel.sendEmbed({ description: 
-			// 	`
-			// 		**ROULETTE HAS ${remainingTime/1000} seconds left**
-			// 		_mc bet ###_ to add to your pool
-			// 		_mc choose ###_ to choose your number
-			// 	`
-			// });
+			message.channel.sendEmbed({ description: 
+				`
+					**ROULETTE HAS BEGAN**
 
+					_bet [amount]_ to bet 
+					_roulette_ to see current bets
+					_status_ to check your own status
+
+					You have 60 seconds to bet
+				`
+			});
 			resolve({message: message, time: time});
 		})
 		return promise;
 	}
 
-	start({message: message,time: 30000})
+	start({message: message,time: 60000})
 		.then(delay)
-		.then(delay)
-		.then(delay)
-		.then(delay)
-		.then(delay)
-		.then(delay)
-		.then(endRoulette)
 		.then(getParticipants)
-		// .then(animation)
 		.then(chooseWinner)
-}
-
-const endRoulette = function({message,time}) {
-	const promise = new Promise((resolve, reject) => {
-		guildRouletteDatabase.update({'guildId': message.guild.id}, {$set: {'roulette': false}}, function(err, guild) {
-			if (err) return handleError(err);
-			message.channel.sendMessage('roulette has ended');
-			resolve(message);
-		})	
-	})
-	return promise;
 }
 
 const getParticipants = function(message) {
@@ -265,10 +273,10 @@ const getParticipants = function(message) {
 			});
 			message.channel.sendEmbed({description: 
 				`
-					${users.map(user => 
+					${users.length == 0 ? 'No one played :(' : users.map(user => 
 					`**${user.name}** has bet **${user.bet}** and has a **${(user.bet/pot*100).toFixed(2)}%** chance to win
 					`).join('')}
-				`
+				`, color: 15473237
 			})
 			resolve({message:message,users:users, pot:pot, raffle:raffle});
 		});	
@@ -276,46 +284,37 @@ const getParticipants = function(message) {
 	return promise;
 }
 
-// const animation = function({message, users, pot, raffle}) {
-// 	const promise = new Promise((resolve, reject) => {
-// 		message.channel.sendMessage(`calculating winner,,,,,,,,,`);				
-// 			resolve({message:message,users:users, pot:pot, raffle:raffle});
-// 		}, 3000);
-// 	})
-// 	return promise;
-// }
-
 const chooseWinner = function({message, users, pot, raffle}) {
+	setTimeout(function() {	
+		if (users.length != 0) {
+			shuffle(raffle);
+			const randomIndex = Math.floor(Math.random() * (raffle.length + 1));
+			const winnerIndex = raffle[randomIndex];
+			const winningUser = users[winnerIndex];
+			const winnerPot = pot - winningUser.bet;
+			
+			// console.log(raffle);
+			// console.log(randomIndex);
+			// console.log(winnerIndex);
 
-	shuffle(raffle);
-	// console.log(raffle)
-	const randomIndex = Math.floor(Math.random() * (raffle.length + 1));
-	const winnerIndex = raffle[randomIndex];
-	const winningUser = users[winnerIndex];
-	pot = pot - winningUser.bet;
-	console.log(pot);
-
-				setTimeout(function() {	
-
-	message.channel.sendMessage(`the winnner is ${winningUser.name} and won ${pot}`);
-	
-	users.forEach(function(user) {
-		// console.log(winningUser);
-		// console.log(user);
-		if (user.userId == winningUser.userId) {
-			userRouletteDatabase.update({'userId': user.userId}, {'choice': null, 'bet': null, 'bank': (user.bank + pot)}, function(err, user) {
-				console.log("winner")
-				if (err) return handleError(err);
-			})	
-		} else {
-			userRouletteDatabase.update({'userId': user.userId}, {'choice': null, 'bet': null, 'bank': (user.bank - user.bet)}, function(err, user) {
-				console.log("reg")
-				if (err) return handleError(err);
-			})				
+			message.channel.sendEmbed({description:
+				`
+					The winner is **${winningUser.name}** and has won **${winnerPot}**
+				`, color: 15473237
+			})
+			users.forEach(function(user) {
+				if (user.userId == winningUser.userId) {
+					userRouletteDatabase.update({'userId': user.userId}, {'choice': null, 'bet': null, 'bank': (user.bank + winnerPot)}, function(err, user) {
+						if (err) return handleError(err);
+					})	
+				} else {
+					userRouletteDatabase.update({'userId': user.userId}, {'choice': null, 'bet': null, 'bank': (user.bank - user.bet)}, function(err, user) {
+						if (err) return handleError(err);
+					})				
+				} 
+			}); 
 		}
-	})
-			}, 3000);
-
+	}, 3000);
 }
 
 function shuffle(a) {
@@ -325,4 +324,4 @@ function shuffle(a) {
     }
 }
 
-module.exports = {begin, account, bet, help};
+module.exports = {begin, account, bet, roulette, help};
