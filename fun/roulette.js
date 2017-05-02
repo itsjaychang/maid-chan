@@ -25,7 +25,7 @@ const roulette = function(message) {
 	userRouletteDatabase.find({'guildId': message.guild.id, 'bet': {$ne:null}}, function(err, users) {
 		message.channel.sendEmbed({ description: 
 			`
-				${users.length == 0 ? 'No one currently betting' : users.map(user => `**${user.name}** has currently bet **${user.bet}**`).join('')}
+				${users.length == 0 ? 'No one currently betting' : users.map(user => `**${user.name}** has currently bet **${user.bet}**`).join('\n')}
 			`, color: 15473237
 		})
 	});	
@@ -106,11 +106,11 @@ const getUser = function(message) {
 }
 
 const betAmount = function({message, user}) {
-	// const split = message.content.split(' ');
-	// const amount = Math.min(Number(splits[1]),500); // Max bet
-	// const amount = Number(split[1]);
-	// var newBet = Math.max(0, user.bet + amount);
-	var newBet = user.bet + 1;
+	const split = message.content.split(' ');
+	const amount = Number(split[1]);
+	if (!Number.isInteger(amount)) return;
+	var newBet = Math.max(0, user.bet + amount);
+	// var newBet = user.bet + 1;
 	if (newBet > user.bank) {
 		message.reply(`${user.name} you have nothing more to bet`)
 		return;
@@ -118,16 +118,15 @@ const betAmount = function({message, user}) {
 	userRouletteDatabase.update({'userId': message.author.id, 'guildId': message.guild.id}, {$set: {'bet': newBet}}, function (err, user) {
 		if (err) return handleError(err);
 	});
-	if(newBet%20 == 0) {
+	// if(newBet%20 == 0) {
 		message.channel.sendEmbed({ description: 
 			`
 				**${message.author.username}** has now bet **${newBet}**
 			`, color: 15473237
 		});
-	}
+	// }
 	return;
 }
-
 
 // const choseValue = function(message) {
 // 	const splits = message.content.split(' ');
@@ -202,7 +201,7 @@ const playRoulette = function(message, guildId) {
 				} else if ((remainingTime%5000 == 0 && remainingTime <= 20000)){
 					message.channel.sendEmbed({ description: 
 					`
-						**ROULETTE HAS ${remainingTime/1000} seconds left**
+						**ROULETTE HAS ${remainingTime/1000} SECONDS LEFT**
 						${remainingTime > 10000 ? `
 						spam _bet_
 						_roulette_ to see current bets

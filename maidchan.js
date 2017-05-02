@@ -32,20 +32,20 @@ client.on('message', (message) => {
 	if (message.channel.type == 'dm') return;
 	if (message.author.bot) return;
 
-	// if (msg.startsWith('bet')) {
-	// 	guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
-	// 		if (guild != null && guild.roulette == true) {
-	// 			roulette.bet(message);
-	// 		}
-	// 	})
-	// }
-	if (msg == ('bet')) {
+	if (msg.startsWith('bet')) {
 		guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
 			if (guild != null && guild.roulette == true) {
 				roulette.bet(message);
 			}
 		})
 	}
+	// if (msg == ('kappa')) {
+	// 	guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
+	// 		if (guild != null && guild.roulette == true) {
+	// 			roulette.bet(message);
+	// 		}
+	// 	})
+	// }
 	if (msg == ('status')) {
 		guildRouletteDatabase.findOne({'guildId': message.guild.id}, function(err, guild) {
 			if (guild != null && guild.roulette == true) {
@@ -126,7 +126,7 @@ client.on('message', (message) => {
 
 	if (msg.startsWith(`${prefix} hungry`)) {		
 		if (users.bakas.includes(message.author.id)) {
-			message.channel.sendMessage('Do you feel like eating shit?')
+			message.channel.sendMessage('Do you feel like eating poo?')
 			return;
 		}	
 		const randomFood = misc.foods[Math.floor((Math.random()*misc.foods.length))];
